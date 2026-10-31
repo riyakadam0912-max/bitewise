@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Apple, ArrowUpRight, Bookmark, Check, Clock3, Heart, Search, Sparkles, Trash2 } from "lucide-react";
+import { Apple, Bookmark, Check, ChefHat, Clock3, Flame, Heart, Search, Sparkles, Trash2, X } from "lucide-react";
 
 export type DashboardSection = "overview" | "diary" | "plans" | "progress" | "recipes" | "profile";
 export type Entry = {id:number;meal:string;name:string;calories:number;protein:number;carbs:number;fat:number;entryDate?:string};
@@ -26,10 +26,12 @@ const foods=[
 ];
 
 const recipes=[
-  {name:"Herbed paneer grain bowl",diet:"Vegetarian",meal:"Dinner",time:"25 min",calories:540,protein:31,carbs:48,fat:24,color:"sage"},
-  {name:"Golden moong chilla",diet:"Vegetarian",meal:"Breakfast",time:"20 min",calories:310,protein:17,carbs:42,fat:8,color:"gold"},
-  {name:"Coconut lentil curry",diet:"Vegan",meal:"Lunch",time:"30 min",calories:465,protein:19,carbs:68,fat:14,color:"peach"},
-  {name:"Lemon pepper fish plate",diet:"Non-vegetarian",meal:"Dinner",time:"28 min",calories:490,protein:42,carbs:44,fat:16,color:"blue"},
+  {name:"Herbed paneer grain bowl",diet:"Vegetarian",meal:"Dinner",time:"25 min",calories:540,protein:31,carbs:48,fat:24,color:"sage",allergens:"Dairy",ingredients:["120g paneer","¾ cup cooked brown rice","Seasonal greens","Mint curd"],method:"Sear the paneer until golden. Layer with warm rice and roasted greens, then finish with mint curd and lemon."},
+  {name:"Golden moong chilla",diet:"Vegetarian",meal:"Breakfast",time:"20 min",calories:310,protein:17,carbs:42,fat:8,color:"gold",allergens:"None declared",ingredients:["¾ cup soaked moong dal","Ginger and cumin","Spinach","Tomato chutney"],method:"Blend soaked dal with aromatics. Fold in spinach and cook thin chillas on a lightly oiled pan."},
+  {name:"Coconut lentil curry",diet:"Vegan",meal:"Lunch",time:"30 min",calories:465,protein:19,carbs:68,fat:14,color:"peach",allergens:"Coconut",ingredients:["¾ cup red lentils","Light coconut milk","Tomato","Coriander and lime"],method:"Simmer lentils with tomato and spices until tender. Stir in coconut milk and finish with coriander and lime."},
+  {name:"Lemon pepper fish plate",diet:"Non-vegetarian",meal:"Dinner",time:"28 min",calories:490,protein:42,carbs:44,fat:16,color:"blue",allergens:"Fish",ingredients:["150g white fish","Baby potatoes","Green beans","Lemon and black pepper"],method:"Roast the potatoes, then bake the seasoned fish until just opaque. Serve with steamed beans and lemon."},
+  {name:"Silken tofu soba",diet:"Vegan",meal:"Lunch",time:"18 min",calories:420,protein:22,carbs:58,fat:12,color:"lilac",allergens:"Soy, gluten",ingredients:["90g soba noodles","120g silken tofu","Cucumber ribbons","Sesame-lime dressing"],method:"Rinse cooked soba until cool. Arrange with tofu and cucumber, then spoon over the sesame-lime dressing."},
+  {name:"Cardamom fruit oats",diet:"Vegetarian",meal:"Breakfast",time:"10 min",calories:355,protein:14,carbs:56,fat:9,color:"rose",allergens:"Dairy, nuts",ingredients:["½ cup rolled oats","¾ cup milk","Seasonal fruit","Almonds and cardamom"],method:"Simmer oats with milk and cardamom until creamy. Top with fresh fruit and chopped almonds."},
 ];
 
 export default function DashboardModules({section,profile,entries,water,saving,post}:Props){
@@ -78,14 +80,17 @@ function Progress({profile,entries,water}:{profile:Profile;entries:Entry[];water
 function Recipes({post}:{post:Props["post"]}){
   const [query,setQuery]=useState("");const [filter,setFilter]=useState("All");
   const [favorites,setFavorites]=useState<string[]>([]);
+  const [selected,setSelected]=useState<(typeof recipes)[number]|null>(null);
   // Synchronize favorites after hydration so server and first client render match.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(()=>{try{setFavorites(JSON.parse(window.localStorage.getItem("bitewise:favorites:v1")??"[]") as string[])}catch{window.localStorage.removeItem("bitewise:favorites:v1")}},[]);
   const visible=recipes.filter(recipe=>(filter==="All"||recipe.diet===filter)&&recipe.name.toLowerCase().includes(query.toLowerCase()));
   const toggle=(name:string)=>{const next=favorites.includes(name)?favorites.filter(item=>item!==name):[...favorites,name];setFavorites(next);window.localStorage.setItem("bitewise:favorites:v1",JSON.stringify(next))};
-  return <div className="module-page"><ModuleHeader kicker="Curated kitchen" title="Recipes" copy="Flexible, familiar recipes with transparent estimates and practical preparation times."/>
+  return <div className="module-page"><ModuleHeader kicker="Curated kitchen" title="Recipes" copy="Flexible, familiar recipes with transparent estimates, simple methods, and practical preparation times."/>
     <div className="recipe-tools"><label><Search size={17}/><input placeholder="Search recipes" value={query} onChange={event=>setQuery(event.target.value)}/></label><div>{["All","Vegetarian","Vegan","Non-vegetarian"].map(item=><button className={filter===item?"selected":""} key={item} onClick={()=>setFilter(item)}>{item}</button>)}</div></div>
-    <div className="recipe-grid">{visible.map(recipe=><article className="recipe-card" key={recipe.name}><div className={`recipe-art art-${recipe.color}`}><button aria-label={`Favorite ${recipe.name}`} onClick={()=>toggle(recipe.name)}><Heart fill={favorites.includes(recipe.name)?"currentColor":"none"}/></button><span>{recipe.meal}</span></div><div><div className="recipe-title"><h2>{recipe.name}</h2><ArrowUpRight/></div><p><Clock3 size={14}/>{recipe.time} · {recipe.calories} kcal · {recipe.protein}g protein</p><div className="card-actions"><span className="tag">{recipe.diet}</span><button className="ghost-btn" onClick={()=>void post({type:"entry",meal:recipe.meal,name:recipe.name,calories:recipe.calories,protein:recipe.protein,carbs:recipe.carbs,fat:recipe.fat})}>Add to diary</button></div></div></article>)}</div>
+    <div className="recipe-grid">{visible.map(recipe=><article className="recipe-card" key={recipe.name}><div className={`recipe-art art-${recipe.color}`}><span>{recipe.meal}</span><button aria-label={`Favorite ${recipe.name}`} onClick={()=>toggle(recipe.name)}><Heart fill={favorites.includes(recipe.name)?"currentColor":"none"}/></button></div><div><div className="recipe-title"><h2>{recipe.name}</h2></div><p><Clock3 size={14}/>{recipe.time}<i/> <Flame size={14}/>{recipe.calories} kcal</p><div className="recipe-macros"><span>{recipe.protein}g <small>protein</small></span><span>{recipe.carbs}g <small>carbs</small></span><span>{recipe.fat}g <small>fat</small></span></div><div className="card-actions"><button className="text-action" onClick={()=>setSelected(recipe)}>View recipe</button><button className="round-add" aria-label={`Add ${recipe.name} to diary`} onClick={()=>void post({type:"entry",meal:recipe.meal,name:recipe.name,calories:recipe.calories,protein:recipe.protein,carbs:recipe.carbs,fat:recipe.fat})}>+</button></div></div></article>)}</div>
+    {!visible.length&&<div className="empty-state"><Search/><h2>No recipes found</h2><p>Try a different search or dietary filter.</p></div>}
+    {selected&&<div className="recipe-overlay" role="dialog" aria-modal="true" aria-label={selected.name} onMouseDown={event=>{if(event.target===event.currentTarget)setSelected(null)}}><article className="recipe-detail"><button className="detail-close" aria-label="Close recipe" onClick={()=>setSelected(null)}><X/></button><div className={`detail-art art-${selected.color}`}><span>{selected.meal}</span><ChefHat/></div><div className="detail-copy"><span className="eyebrow">{selected.diet} · {selected.time}</span><h2 className="display">{selected.name}</h2><p>{selected.method}</p><div className="detail-nutrition"><span><b>{selected.calories}</b> kcal</span><span><b>{selected.protein}g</b> protein</span><span><b>{selected.carbs}g</b> carbs</span><span><b>{selected.fat}g</b> fat</span></div><h3>What you’ll need</h3><ul>{selected.ingredients.map(item=><li key={item}>{item}</li>)}</ul><p className="allergen-note"><b>Allergens:</b> {selected.allergens}. Nutrition is an estimate and homemade portions vary.</p><button className="pill pill-dark" onClick={()=>{void post({type:"entry",meal:selected.meal,name:selected.name,calories:selected.calories,protein:selected.protein,carbs:selected.carbs,fat:selected.fat});setSelected(null)}}>Add to today’s diary</button></div></article></div>}
   </div>;
 }
 
