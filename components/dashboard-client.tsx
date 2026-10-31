@@ -2,9 +2,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Apple, BookOpen, Droplets, Gauge, Heart, LogOut, Plus, Sparkles, Trash2, TrendingUp, UserRound } from "lucide-react";
+import DashboardModules, { type DashboardSection, type Entry, type Profile } from "./dashboard-modules";
 
-type Entry={id:number;meal:string;name:string;calories:number;protein:number;carbs:number;fat:number};
-type Profile={displayName:string;goal:string;diet:string;cuisine:string;calorieTarget:number;proteinTarget:number;carbsTarget:number;fatTarget:number;waterTarget:number;onboardingComplete:boolean};
 type NutritionResponse={profile:Profile|null;entries:Entry[];water:number};
 type DashboardProps={user:{name:string;email:string};signOut:string;storage:"api"|"browser"};
 const STORAGE_KEY="bitewise:nutrition:v1";
@@ -17,6 +16,7 @@ const suggested=[
 const weekly=[68,82,59,91,74,86,63];
 
 export default function DashboardClient({user,signOut,storage}:DashboardProps){
+  const [section,setSection]=useState<DashboardSection>("overview");
   const [profile,setProfile]=useState<Profile|null>(null); const [entries,setEntries]=useState<Entry[]>([]); const [water,setWater]=useState(0); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [step,setStep]=useState(0);
   const [setup,setSetup]=useState({displayName:user.name.split("@")[0],goal:"Maintain weight",diet:"Vegetarian",cuisine:"Indian"});
   const [form,setForm]=useState({name:"",calories:"",protein:"",meal:"Lunch"});
@@ -37,11 +37,11 @@ export default function DashboardClient({user,signOut,storage}:DashboardProps){
       let nextProfile=profile;let nextEntries=entries;let nextWater=water;
       if(data.type==="profile"){
         const goal=String(data.goal??"Maintain weight");
-        nextProfile={displayName:String(data.displayName??user.name),goal,diet:String(data.diet??"Vegetarian"),cuisine:String(data.cuisine??"Indian"),calorieTarget:goal==="Build muscle"?2300:goal==="Lose weight gently"?1800:2000,proteinTarget:goal==="Build muscle"?130:105,carbsTarget:250,fatTarget:65,waterTarget:8,onboardingComplete:true};
+        nextProfile={displayName:String(data.displayName??user.name),goal,diet:String(data.diet??"Vegetarian"),cuisine:String(data.cuisine??"Indian"),calorieTarget:Number(data.calorieTarget)||(goal==="Build muscle"?2300:goal==="Lose weight gently"?1800:2000),proteinTarget:Number(data.proteinTarget)||(goal==="Build muscle"?130:105),carbsTarget:Number(data.carbsTarget)||250,fatTarget:Number(data.fatTarget)||65,waterTarget:Number(data.waterTarget)||8,onboardingComplete:true};
         setProfile(nextProfile);
       }else if(data.type==="entry"){
         const calories=Number(data.calories)||0;
-        const entry:Entry={id:entries.reduce((max,item)=>Math.max(max,item.id),0)+1,meal:String(data.meal??"Lunch"),name:String(data.name??"Custom food"),calories,protein:Number(data.protein)||0,carbs:Number(data.carbs)||0,fat:Number(data.fat)||0};
+        const entry:Entry={id:entries.reduce((max,item)=>Math.max(max,item.id),0)+1,entryDate:new Date().toISOString().slice(0,10),meal:String(data.meal??"Lunch"),name:String(data.name??"Custom food"),calories,protein:Number(data.protein)||0,carbs:Number(data.carbs)||0,fat:Number(data.fat)||0};
         nextEntries=[...entries,entry];setEntries(nextEntries);
       }else if(data.type==="water"){
         nextWater=Math.max(0,Math.min(20,Number(data.glasses)||0));setWater(nextWater);
@@ -59,7 +59,10 @@ export default function DashboardClient({user,signOut,storage}:DashboardProps){
   const addFood=(e:FormEvent)=>{e.preventDefault();if(!form.name||!form.calories)return;void post({type:"entry",name:form.name,calories:Number(form.calories),protein:Number(form.protein)||0,carbs:(Number(form.calories)*.45)/4,fat:(Number(form.calories)*.25)/9,meal:form.meal});setForm({name:"",calories:"",protein:"",meal:"Lunch"})};
   const addSuggested=(food:typeof suggested[number])=>void post({type:"entry",...food});
   return <div className="app-shell">
-    <aside className="sidebar"><Link href="/" className="brand" style={{color:"white"}}><span className="mark" style={{borderColor:"white"}}/>BiteWise</Link><nav className="side-nav"><a className="active"><Gauge size={17}/> Overview</a><a><Apple size={17}/> Food diary</a><a><BookOpen size={17}/> Meal plans</a><a><TrendingUp size={17}/> Progress</a><a><Heart size={17}/> Recipes</a><a><UserRound size={17}/> Profile</a></nav><div className="side-bottom"><a href={signOut} target="_top" className="pill" style={{background:"#ffffff12",color:"white"}}><LogOut size={15}/> Sign out</a></div></aside>
+    <aside className="sidebar"><Link href="/" className="brand" style={{color:"white"}}><span className="mark" style={{borderColor:"white"}}/>BiteWise</Link><nav className="side-nav">{([
+      ["overview","Overview",<Gauge size={17} key="overview"/>],["diary","Food diary",<Apple size={17} key="diary"/>],["plans","Meal plans",<BookOpen size={17} key="plans"/>],["progress","Progress",<TrendingUp size={17} key="progress"/>],["recipes","Recipes",<Heart size={17} key="recipes"/>],["profile","Profile",<UserRound size={17} key="profile"/>]
+    ] as const).map(([id,label,icon])=><button className={section===id?"active":""} key={id} onClick={()=>setSection(id)}>{icon}<span>{label}</span></button>)}</nav><div className="side-bottom"><a href={signOut} target="_top" className="pill" style={{background:"#ffffff12",color:"white"}}><LogOut size={15}/> Sign out</a></div></aside>
+    {section==="overview"?
     <main className="app-main"><header className="app-top"><div><span className="eyebrow">{new Date().toLocaleDateString("en-IN",{weekday:"long",month:"long",day:"numeric"})}</span><h1 className="display">Good morning, {p.displayName.split(" ")[0]}.</h1><p className="fine">Let’s make today a balanced one.</p></div><button className="pill pill-dark" onClick={()=>document.getElementById("food-name")?.focus()}><Plus size={16}/> Add food</button></header>
       {loading?<div className="card">Loading your nutrition space…</div>:<div className="grid-main"><div style={{display:"grid",gap:18}}>
         <section className="card"><div className="cal-grid"><div className="ring big-ring" style={{background:`conic-gradient(var(--peach) 0 ${pct(totals.calories,p.calorieTarget)}%,#eee8dc ${pct(totals.calories,p.calorieTarget)}%)`}}><span><b>{Math.round(totals.calories)}</b><small className="fine">of {p.calorieTarget} kcal</small></span></div><div><span className="eyebrow">Today’s nutrition</span><h2 style={{color:"var(--forest)",margin:"8px 0"}}>{Math.max(0,p.calorieTarget-Math.round(totals.calories))} kcal remaining</h2>{[["Protein",totals.protein,p.proteinTarget,"#668e82"],["Carbohydrates",totals.carbs,p.carbsTarget,"#d39b63"],["Fat",totals.fat,p.fatTarget,"#b88a9a"]].map(([n,v,t,c])=><div className="macro-line" key={String(n)}><header><span>{n}</span><span>{Math.round(Number(v))}g / {t}g</span></header><div className="macro"><i style={{width:`${pct(Number(v),Number(t))}%`,background:String(c)}}/></div></div>)}</div></div></section>
@@ -72,7 +75,7 @@ export default function DashboardClient({user,signOut,storage}:DashboardProps){
         <section className="card"><span className="eyebrow">Weekly overview</span><div className="chart">{weekly.map((h,i)=><div key={i} className="bar" style={{height:`${h}%`}} title={`${["M","T","W","T","F","S","S"][i]}: illustrative trend`}/>)}</div><div style={{display:"flex",justifyContent:"space-between"}}>{["M","T","W","T","F","S","S"].map((d,i)=><small className="fine" key={i}>{d}</small>)}</div><p className="fine">Illustrative until seven days of entries are available.</p></section>
         <section className="card"><span className="eyebrow">Your meal plan</span><h2 style={{color:"var(--forest)"}}>{p.diet} · {p.cuisine}</h2><p className="fine">Paneer harvest bowl with brown rice, roasted greens and mint curd.</p><button className="ghost-btn" onClick={()=>addSuggested(suggested[2])}>Add dinner to diary</button></section>
       </aside></div>}
-    </main>
+    </main>:<main className="app-main"><DashboardModules section={section} profile={p} entries={entries} water={water} saving={saving} post={post}/></main>}
     {!loading&&!p.onboardingComplete&&<div className="onboard"><div className="on-card"><div className="progress"><i style={{width:`${(step+1)*25}%`}}/></div><span className="eyebrow" style={{display:"block",marginTop:24}}>Step {step+1} of 4</span><h2 className="display" style={{fontSize:"2.8rem",color:"var(--forest)",margin:"10px 0"}}>{["What should we call you?","What would you like to work toward?","Which way of eating fits you?","What food feels most familiar?"][step]}</h2>{step===0?<input className="field" value={setup.displayName} onChange={e=>setSetup({...setup,displayName:e.target.value})}/>:<div className="choices">{(step===1?["Maintain weight","Lose weight gently","Build muscle","General healthy eating"]:step===2?["Vegetarian","Non-vegetarian","Vegan","Eggetarian"]:["Indian","Mediterranean","Asian","Mixed cuisine"]).map(x=><button className={`choice ${Object.values(setup).includes(x)?"selected":""}`} key={x} onClick={()=>setSetup({...setup,[step===1?"goal":step===2?"diet":"cuisine"]:x})}>{x}</button>)}</div>}<p className="fine">Estimates are for general wellness, not medical care. Significant allergies or medical dietary needs should be reviewed with a qualified professional.</p><div className="actions" style={{justifyContent:"space-between"}}><button className="pill pill-light" disabled={step===0} onClick={()=>setStep(Math.max(0,step-1))}>Back</button>{step<3?<button className="pill pill-dark" onClick={()=>setStep(step+1)}>Continue</button>:<button className="pill pill-dark" onClick={()=>void post({type:"profile",...setup})}>{saving?"Creating…":"Create my plan"}</button>}</div></div></div>}
   </div>;
 }

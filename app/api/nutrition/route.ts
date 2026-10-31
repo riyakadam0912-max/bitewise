@@ -23,8 +23,10 @@ export async function POST(request: Request) {
   const db = getDb(); const now = new Date().toISOString();
   if (body.type === "profile") {
     const goal = String(body.goal ?? "Maintain weight"); const diet = String(body.diet ?? "Vegetarian");
-    const target = goal === "Build muscle" ? 2300 : goal === "Lose weight gently" ? 1800 : 2000;
-    await db.insert(profiles).values({ userId:user.userId, displayName:String(body.displayName ?? user.displayName), goal, diet, cuisine:String(body.cuisine ?? "Indian"), calorieTarget:target, proteinTarget:goal === "Build muscle" ? 130 : 105, carbsTarget:250, fatTarget:65, waterTarget:8, onboardingComplete:true, updatedAt:now }).onConflictDoUpdate({ target:profiles.userId, set:{ displayName:String(body.displayName ?? user.displayName), goal, diet, cuisine:String(body.cuisine ?? "Indian"), calorieTarget:target, proteinTarget:goal === "Build muscle" ? 130 : 105, onboardingComplete:true, updatedAt:now } });
+    const target = Number(body.calorieTarget) || (goal === "Build muscle" ? 2300 : goal === "Lose weight gently" ? 1800 : 2000);
+    const proteinTarget = Number(body.proteinTarget) || (goal === "Build muscle" ? 130 : 105);
+    const carbsTarget = Number(body.carbsTarget) || 250; const fatTarget = Number(body.fatTarget) || 65; const waterTarget = Number(body.waterTarget) || 8;
+    await db.insert(profiles).values({ userId:user.userId, displayName:String(body.displayName ?? user.displayName), goal, diet, cuisine:String(body.cuisine ?? "Indian"), calorieTarget:target, proteinTarget, carbsTarget, fatTarget, waterTarget, onboardingComplete:true, updatedAt:now }).onConflictDoUpdate({ target:profiles.userId, set:{ displayName:String(body.displayName ?? user.displayName), goal, diet, cuisine:String(body.cuisine ?? "Indian"), calorieTarget:target, proteinTarget, carbsTarget, fatTarget, waterTarget, onboardingComplete:true, updatedAt:now } });
   } else if (body.type === "entry") {
     await db.insert(diaryEntries).values({ userId:user.userId, entryDate:today(), meal:String(body.meal ?? "Lunch"), name:String(body.name ?? "Custom food"), calories:Number(body.calories) || 0, protein:Number(body.protein) || 0, carbs:Number(body.carbs) || 0, fat:Number(body.fat) || 0, createdAt:now });
   } else if (body.type === "water") {
