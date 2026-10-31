@@ -6,6 +6,8 @@ import { Apple, BookOpen, Droplets, Gauge, Heart, LogOut, Plus, Sparkles, Trash2
 type Entry={id:number;meal:string;name:string;calories:number;protein:number;carbs:number;fat:number};
 type Profile={displayName:string;goal:string;diet:string;cuisine:string;calorieTarget:number;proteinTarget:number;carbsTarget:number;fatTarget:number;waterTarget:number;onboardingComplete:boolean};
 type NutritionResponse={profile:Profile|null;entries:Entry[];water:number};
+type DashboardProps={user:{name:string;email:string};signOut:string;storage:"api"|"browser"};
+const STORAGE_KEY="bitewise:nutrition:v1";
 const suggested=[
   {name:"Vegetable poha",calories:385,protein:9,carbs:62,fat:11,meal:"Breakfast"},
   {name:"Dal, rice & cucumber",calories:612,protein:22,carbs:102,fat:12,meal:"Lunch"},
@@ -14,14 +16,43 @@ const suggested=[
 ];
 const weekly=[68,82,59,91,74,86,63];
 
-export default function DashboardClient({user,signOut}:{user:{name:string;email:string};signOut:string}){
+export default function DashboardClient({user,signOut,storage}:DashboardProps){
   const [profile,setProfile]=useState<Profile|null>(null); const [entries,setEntries]=useState<Entry[]>([]); const [water,setWater]=useState(0); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [step,setStep]=useState(0);
   const [setup,setSetup]=useState({displayName:user.name.split("@")[0],goal:"Maintain weight",diet:"Vegetarian",cuisine:"Indian"});
   const [form,setForm]=useState({name:"",calories:"",protein:"",meal:"Lunch"});
-  const load=async()=>{const r=await fetch("/api/nutrition");if(r.ok){const d=await r.json() as NutritionResponse;setProfile(d.profile);setEntries(d.entries);setWater(d.water)}setLoading(false)};
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  const load=async()=>{
+    if(storage==="browser"){
+      const saved=window.localStorage.getItem(STORAGE_KEY);
+      if(saved){try{const d=JSON.parse(saved) as NutritionResponse;setProfile(d.profile);setEntries(d.entries);setWater(d.water)}catch{window.localStorage.removeItem(STORAGE_KEY)}}
+      setLoading(false);return;
+    }
+    const r=await fetch("/api/nutrition");if(r.ok){const d=await r.json() as NutritionResponse;setProfile(d.profile);setEntries(d.entries);setWater(d.water)}setLoading(false)
+  };
+  // Initial synchronization intentionally runs once for this dashboard session.
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(()=>{void load()},[]);
-  const post=async(data:Record<string,unknown>)=>{setSaving(true);const r=await fetch("/api/nutrition",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});setSaving(false);if(r.ok)await load()};
+  const post=async(data:Record<string,unknown>)=>{
+    setSaving(true);
+    if(storage==="browser"){
+      let nextProfile=profile;let nextEntries=entries;let nextWater=water;
+      if(data.type==="profile"){
+        const goal=String(data.goal??"Maintain weight");
+        nextProfile={displayName:String(data.displayName??user.name),goal,diet:String(data.diet??"Vegetarian"),cuisine:String(data.cuisine??"Indian"),calorieTarget:goal==="Build muscle"?2300:goal==="Lose weight gently"?1800:2000,proteinTarget:goal==="Build muscle"?130:105,carbsTarget:250,fatTarget:65,waterTarget:8,onboardingComplete:true};
+        setProfile(nextProfile);
+      }else if(data.type==="entry"){
+        const calories=Number(data.calories)||0;
+        const entry:Entry={id:entries.reduce((max,item)=>Math.max(max,item.id),0)+1,meal:String(data.meal??"Lunch"),name:String(data.name??"Custom food"),calories,protein:Number(data.protein)||0,carbs:Number(data.carbs)||0,fat:Number(data.fat)||0};
+        nextEntries=[...entries,entry];setEntries(nextEntries);
+      }else if(data.type==="water"){
+        nextWater=Math.max(0,Math.min(20,Number(data.glasses)||0));setWater(nextWater);
+      }else if(data.type==="delete"){
+        nextEntries=entries.filter(entry=>entry.id!==Number(data.id));setEntries(nextEntries);
+      }
+      window.localStorage.setItem(STORAGE_KEY,JSON.stringify({profile:nextProfile,entries:nextEntries,water:nextWater} satisfies NutritionResponse));
+      setSaving(false);return;
+    }
+    const r=await fetch("/api/nutrition",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});setSaving(false);if(r.ok)await load()
+  };
   const totals=useMemo(()=>entries.reduce((a,e)=>({calories:a.calories+e.calories,protein:a.protein+e.protein,carbs:a.carbs+e.carbs,fat:a.fat+e.fat}),{calories:0,protein:0,carbs:0,fat:0}),[entries]);
   const p=profile??{displayName:user.name,goal:"Maintain weight",diet:"Vegetarian",cuisine:"Indian",calorieTarget:2000,proteinTarget:105,carbsTarget:250,fatTarget:65,waterTarget:8,onboardingComplete:false};
   const pct=(v:number,t:number)=>Math.min(100,Math.round(v/t*100));

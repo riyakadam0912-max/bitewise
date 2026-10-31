@@ -1,5 +1,5 @@
 import { ArrowRight, Check, Leaf, Sparkles } from "lucide-react";
-import { chatGPTSignInPath, getChatGPTUser } from "./chatgpt-auth";
+import { getChatGPTUser } from "./chatgpt-auth";
 
 const faqs = [
   ["How does BiteWise calculate my daily target?", "We use your profile, activity level, and goal to estimate daily energy needs with established formulas. Every result is an approximation that you can review."],
@@ -12,7 +12,7 @@ const faqs = [
 
 export default async function Home() {
   const user = await getChatGPTUser();
-  const appHref = user ? "/dashboard" : chatGPTSignInPath("/dashboard");
+  const appHref = "/dashboard";
   return <>
     <nav className="nav"><div className="shell nav-in">
       <a className="brand" href="#top"><span className="mark"/>BiteWise</a>
