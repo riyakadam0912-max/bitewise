@@ -1,9 +1,11 @@
 "use client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Apple, BookOpen, Droplets, Gauge, Heart, Leaf, LogOut, Plus, Sparkles, Trash2, TrendingUp, UserRound } from "lucide-react";
+import Link from "next/link";
+import { Apple, BookOpen, Droplets, Gauge, Heart, LogOut, Plus, Sparkles, Trash2, TrendingUp, UserRound } from "lucide-react";
 
 type Entry={id:number;meal:string;name:string;calories:number;protein:number;carbs:number;fat:number};
 type Profile={displayName:string;goal:string;diet:string;cuisine:string;calorieTarget:number;proteinTarget:number;carbsTarget:number;fatTarget:number;waterTarget:number;onboardingComplete:boolean};
+type NutritionResponse={profile:Profile|null;entries:Entry[];water:number};
 const suggested=[
   {name:"Vegetable poha",calories:385,protein:9,carbs:62,fat:11,meal:"Breakfast"},
   {name:"Dal, rice & cucumber",calories:612,protein:22,carbs:102,fat:12,meal:"Lunch"},
@@ -16,7 +18,8 @@ export default function DashboardClient({user,signOut}:{user:{name:string;email:
   const [profile,setProfile]=useState<Profile|null>(null); const [entries,setEntries]=useState<Entry[]>([]); const [water,setWater]=useState(0); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [step,setStep]=useState(0);
   const [setup,setSetup]=useState({displayName:user.name.split("@")[0],goal:"Maintain weight",diet:"Vegetarian",cuisine:"Indian"});
   const [form,setForm]=useState({name:"",calories:"",protein:"",meal:"Lunch"});
-  const load=async()=>{const r=await fetch("/api/nutrition");if(r.ok){const d=await r.json();setProfile(d.profile);setEntries(d.entries);setWater(d.water)}setLoading(false)};
+  const load=async()=>{const r=await fetch("/api/nutrition");if(r.ok){const d=await r.json() as NutritionResponse;setProfile(d.profile);setEntries(d.entries);setWater(d.water)}setLoading(false)};
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(()=>{void load()},[]);
   const post=async(data:Record<string,unknown>)=>{setSaving(true);const r=await fetch("/api/nutrition",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});setSaving(false);if(r.ok)await load()};
   const totals=useMemo(()=>entries.reduce((a,e)=>({calories:a.calories+e.calories,protein:a.protein+e.protein,carbs:a.carbs+e.carbs,fat:a.fat+e.fat}),{calories:0,protein:0,carbs:0,fat:0}),[entries]);
@@ -25,7 +28,7 @@ export default function DashboardClient({user,signOut}:{user:{name:string;email:
   const addFood=(e:FormEvent)=>{e.preventDefault();if(!form.name||!form.calories)return;void post({type:"entry",name:form.name,calories:Number(form.calories),protein:Number(form.protein)||0,carbs:(Number(form.calories)*.45)/4,fat:(Number(form.calories)*.25)/9,meal:form.meal});setForm({name:"",calories:"",protein:"",meal:"Lunch"})};
   const addSuggested=(food:typeof suggested[number])=>void post({type:"entry",...food});
   return <div className="app-shell">
-    <aside className="sidebar"><a href="/" className="brand" style={{color:"white"}}><span className="mark" style={{borderColor:"white"}}/>BiteWise</a><nav className="side-nav"><a className="active"><Gauge size={17}/> Overview</a><a><Apple size={17}/> Food diary</a><a><BookOpen size={17}/> Meal plans</a><a><TrendingUp size={17}/> Progress</a><a><Heart size={17}/> Recipes</a><a><UserRound size={17}/> Profile</a></nav><div className="side-bottom"><a href={signOut} target="_top" className="pill" style={{background:"#ffffff12",color:"white"}}><LogOut size={15}/> Sign out</a></div></aside>
+    <aside className="sidebar"><Link href="/" className="brand" style={{color:"white"}}><span className="mark" style={{borderColor:"white"}}/>BiteWise</Link><nav className="side-nav"><a className="active"><Gauge size={17}/> Overview</a><a><Apple size={17}/> Food diary</a><a><BookOpen size={17}/> Meal plans</a><a><TrendingUp size={17}/> Progress</a><a><Heart size={17}/> Recipes</a><a><UserRound size={17}/> Profile</a></nav><div className="side-bottom"><a href={signOut} target="_top" className="pill" style={{background:"#ffffff12",color:"white"}}><LogOut size={15}/> Sign out</a></div></aside>
     <main className="app-main"><header className="app-top"><div><span className="eyebrow">{new Date().toLocaleDateString("en-IN",{weekday:"long",month:"long",day:"numeric"})}</span><h1 className="display">Good morning, {p.displayName.split(" ")[0]}.</h1><p className="fine">Let’s make today a balanced one.</p></div><button className="pill pill-dark" onClick={()=>document.getElementById("food-name")?.focus()}><Plus size={16}/> Add food</button></header>
       {loading?<div className="card">Loading your nutrition space…</div>:<div className="grid-main"><div style={{display:"grid",gap:18}}>
         <section className="card"><div className="cal-grid"><div className="ring big-ring" style={{background:`conic-gradient(var(--peach) 0 ${pct(totals.calories,p.calorieTarget)}%,#eee8dc ${pct(totals.calories,p.calorieTarget)}%)`}}><span><b>{Math.round(totals.calories)}</b><small className="fine">of {p.calorieTarget} kcal</small></span></div><div><span className="eyebrow">Today’s nutrition</span><h2 style={{color:"var(--forest)",margin:"8px 0"}}>{Math.max(0,p.calorieTarget-Math.round(totals.calories))} kcal remaining</h2>{[["Protein",totals.protein,p.proteinTarget,"#668e82"],["Carbohydrates",totals.carbs,p.carbsTarget,"#d39b63"],["Fat",totals.fat,p.fatTarget,"#b88a9a"]].map(([n,v,t,c])=><div className="macro-line" key={String(n)}><header><span>{n}</span><span>{Math.round(Number(v))}g / {t}g</span></header><div className="macro"><i style={{width:`${pct(Number(v),Number(t))}%`,background:String(c)}}/></div></div>)}</div></div></section>
