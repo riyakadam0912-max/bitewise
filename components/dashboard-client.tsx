@@ -1,7 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Apple, BookOpen, Droplets, Gauge, Heart, LogOut, Plus, Sparkles, Trash2, TrendingUp, UserRound } from "lucide-react";
+import { Apple, BookOpen, ChevronLeft, ChevronRight, Droplets, Gauge, Heart, LogOut, Plus, Sparkles, Trash2, TrendingUp, UserRound } from "lucide-react";
 import DashboardModules, { type DashboardSection, type Entry, type Profile } from "./dashboard-modules";
 
 type NutritionResponse={profile:Profile|null;entries:Entry[];water:number};
@@ -14,9 +14,11 @@ const suggested=[
   {name:"Fruit & roasted almonds",calories:210,protein:6,carbs:28,fat:10,meal:"Snacks"},
 ];
 const weekly=[68,82,59,91,74,86,63];
+const dashboardFlow:[DashboardSection,string][]=[["overview","Overview"],["diary","Food diary"],["plans","Meal plans"],["recipes","Recipes"],["progress","Progress"],["profile","Profile"]];
 
 export default function DashboardClient({user,signOut,storage}:DashboardProps){
   const [section,setSection]=useState<DashboardSection>("overview");
+  const flowIndex=dashboardFlow.findIndex(([id])=>id===section);
   const [profile,setProfile]=useState<Profile|null>(null); const [entries,setEntries]=useState<Entry[]>([]); const [water,setWater]=useState(0); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [step,setStep]=useState(0);
   const [setup,setSetup]=useState({displayName:user.name.split("@")[0],goal:"Maintain weight",diet:"Vegetarian",cuisine:"Indian"});
   const [form,setForm]=useState({name:"",calories:"",protein:"",meal:"Lunch"});
@@ -75,7 +77,7 @@ export default function DashboardClient({user,signOut,storage}:DashboardProps){
         <section className="card"><span className="eyebrow">Weekly overview</span><div className="chart">{weekly.map((h,i)=><div key={i} className="bar" style={{height:`${h}%`}} title={`${["M","T","W","T","F","S","S"][i]}: illustrative trend`}/>)}</div><div style={{display:"flex",justifyContent:"space-between"}}>{["M","T","W","T","F","S","S"].map((d,i)=><small className="fine" key={i}>{d}</small>)}</div><p className="fine">Illustrative until seven days of entries are available.</p></section>
         <section className="card"><span className="eyebrow">Your meal plan</span><h2 style={{color:"var(--forest)"}}>{p.diet} · {p.cuisine}</h2><p className="fine">Paneer harvest bowl with brown rice, roasted greens and mint curd.</p><button className="ghost-btn" onClick={()=>addSuggested(suggested[2])}>Add dinner to diary</button></section>
       </aside></div>}
-    </main>:<main className="app-main"><DashboardModules section={section} profile={p} entries={entries} water={water} saving={saving} post={post}/></main>}
+    </main>:<main className="app-main"><nav className="module-journey" aria-label="BiteWise dashboard journey">{dashboardFlow.map(([id,label],index)=><button key={id} className={section===id?"current":index<flowIndex?"complete":""} onClick={()=>setSection(id)}><i>{index<flowIndex?"✓":index+1}</i><span>{label}</span></button>)}</nav><DashboardModules section={section} profile={p} entries={entries} water={water} saving={saving} post={post}/><footer className="flow-actions"><button disabled={flowIndex===0} onClick={()=>setSection(dashboardFlow[Math.max(0,flowIndex-1)][0])}><ChevronLeft/> Previous</button><div><span>Step {flowIndex+1} of {dashboardFlow.length}</span><b>{dashboardFlow[flowIndex][1]}</b></div>{flowIndex<dashboardFlow.length-1?<button className="next" onClick={()=>setSection(dashboardFlow[flowIndex+1][0])}>Next: {dashboardFlow[flowIndex+1][1]} <ChevronRight/></button>:<button className="next" onClick={()=>setSection("overview")}>Return to overview <ChevronRight/></button>}</footer></main>}
     {!loading&&!p.onboardingComplete&&<div className="onboard"><div className="on-card"><div className="progress"><i style={{width:`${(step+1)*25}%`}}/></div><span className="eyebrow" style={{display:"block",marginTop:24}}>Step {step+1} of 4</span><h2 className="display" style={{fontSize:"2.8rem",color:"var(--forest)",margin:"10px 0"}}>{["What should we call you?","What would you like to work toward?","Which way of eating fits you?","What food feels most familiar?"][step]}</h2>{step===0?<input className="field" value={setup.displayName} onChange={e=>setSetup({...setup,displayName:e.target.value})}/>:<div className="choices">{(step===1?["Maintain weight","Lose weight gently","Build muscle","General healthy eating"]:step===2?["Vegetarian","Non-vegetarian","Vegan","Eggetarian"]:["Indian","Mediterranean","Asian","Mixed cuisine"]).map(x=><button className={`choice ${Object.values(setup).includes(x)?"selected":""}`} key={x} onClick={()=>setSetup({...setup,[step===1?"goal":step===2?"diet":"cuisine"]:x})}>{x}</button>)}</div>}<p className="fine">Estimates are for general wellness, not medical care. Significant allergies or medical dietary needs should be reviewed with a qualified professional.</p><div className="actions" style={{justifyContent:"space-between"}}><button className="pill pill-light" disabled={step===0} onClick={()=>setStep(Math.max(0,step-1))}>Back</button>{step<3?<button className="pill pill-dark" onClick={()=>setStep(step+1)}>Continue</button>:<button className="pill pill-dark" onClick={()=>void post({type:"profile",...setup})}>{saving?"Creating…":"Create my plan"}</button>}</div></div></div>}
   </div>;
 }
